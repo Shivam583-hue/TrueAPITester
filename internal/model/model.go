@@ -50,14 +50,32 @@ func (m *Model) Init() tea.Cmd {
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 
 	case tea.KeyMsg:
+		if m.focused == FocusUri {
+			switch msg.Type {
+			case tea.KeyRunes:
+				m.uri += string(msg.Runes)
+			case tea.KeyBackspace:
+				if len(m.uri) > 0 {
+					runes := []rune(m.uri)
+					m.uri = string(runes[:len(runes)-1])
+				}
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.quitting = true
 			return m, tea.Quit
+		case "right":
+			m.focused = m.focused.Next()
+		case "left":
+			m.focused = m.focused.Prev()
+
 		}
 	}
 
