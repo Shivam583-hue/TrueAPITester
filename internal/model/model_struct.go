@@ -37,10 +37,10 @@ type Model struct {
 
 	focused Focus
 
-	uri        string
-	response   Response
-	editorTab  int
-	previewTab int
+	uri       string
+	response  Response
+	editorTab int
+	resultTab int
 
 	RequestsWidth  int
 	RequestsHeight int
@@ -51,8 +51,8 @@ type Model struct {
 	EditorWidth  int
 	EditorHeight int
 
-	PreviewWidth  int
-	PreviewHeight int
+	ResultWidth  int
+	ResultHeight int
 
 	choices  []string
 	cursor   int
