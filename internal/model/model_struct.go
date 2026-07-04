@@ -36,6 +36,14 @@ type authField struct {
 	value *string
 }
 
+type responseMsg struct {
+	status int
+	body   string
+}
+type responseErr struct {
+	err error
+}
+
 type Auth struct {
 	authtype AuthType
 

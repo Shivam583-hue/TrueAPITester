@@ -3,6 +3,7 @@ package model
 import (
 	"strings"
 
+	httpclient "github.com/Shivam583-hue/TrueAPITester/internal/httpClient"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -74,6 +75,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+
+	case responseMsg:
+		r := m.activeRequest()
+		r.response.Status = msg.status
+		r.response.Body = msg.body
+
+	case responseErr:
+		return m, nil
 
 	case tea.KeyMsg:
 		if m.namingRequest {
@@ -273,6 +282,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case FocusResult:
 				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
 			}
+		case "ctrl+s":
+			req := m.activeRequest()
+			return m, sendRequestCmd(req.method, req.uri)
 		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
@@ -291,4 +303,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 	}
 	return m, nil
+}
+
+func sendRequestCmd(method, url string) tea.Cmd {
+	return func() tea.Msg {
+		status, body, err := httpclient.SendRequest(method, url)
+		if err != nil {
+			return responseErr{err}
+		}
+		return responseMsg{status, body}
+	}
 }

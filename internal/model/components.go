@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
@@ -8,7 +10,6 @@ import (
 
 func (m Model) renderEditor(width int, height int, focused bool, resp Response, activeTab int) string {
 	var body string
-
 	switch activeTab {
 	case 0: // Body
 		body = m.activeRequest().editor.body
@@ -92,12 +93,10 @@ func (m Model) renderResult(resp Response, activeTab int, width, height int, foc
 		// same shape as Headers for now
 	}
 
-	// status bar: uncomment and expand when HTTP responses are wired up:
-	// status := fmt.Sprintf("Status: %s  Time: %dms  Size: %s",
-	// 	styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
-	// 	resp.TimeMs, resp.SizeStr)
+	status := fmt.Sprintf("Status: %s",
+		styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
 
-	content := tabs + "\n\n" + body
+	content := tabs + "\n\n" + body + "\n\n" + status
 
 	return styles.TitledPane("Result", content, width, height, focused)
 }
