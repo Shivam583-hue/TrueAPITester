@@ -14,7 +14,16 @@ const (
 var httpMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 func New() *Model {
-	return &Model{method: "GET"}
+	return &Model{}
+}
+
+// activeRequest returns the request under the sidebar cursor, or nil when
+// there are no requests. All pane reads/writes should go through this.
+func (m *Model) activeRequest() *Requests {
+	if len(m.requests) == 0 {
+		return nil
+	}
+	return &m.requests[m.requestCursor]
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -42,7 +51,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case tea.KeyEnter:
 				if name := strings.TrimSpace(m.nameInput); name != "" {
-					m.requests = append(m.requests, name)
+					m.requests = append(m.requests, Requests{title: name, method: "GET"})
 					m.requestCursor = len(m.requests) - 1
 				}
 				m.nameInput = ""
@@ -59,11 +68,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.focused == FocusUri {
 			switch msg.Type {
 			case tea.KeyRunes:
-				m.uri += string(msg.Runes)
+				m.activeRequest().uri += string(msg.Runes)
 			case tea.KeyBackspace:
-				if len(m.uri) > 0 {
-					runes := []rune(m.uri)
-					m.uri = string(runes[:len(runes)-1])
+				if len(m.activeRequest().uri) > 0 {
+					runes := []rune(m.activeRequest().uri)
+					m.activeRequest().uri = string(runes[:len(runes)-1])
 				}
 			}
 			switch msg.String() {
@@ -75,8 +84,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "m":
 				for i, method := range httpMethods {
-					if method == m.method {
-						m.method = httpMethods[(i+1)%len(httpMethods)]
+					if method == m.activeRequest().method {
+						m.activeRequest().method = httpMethods[(i+1)%len(httpMethods)]
 						break
 					}
 				}
@@ -110,9 +119,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			switch m.focused {
 			case FocusEditor:
-				m.editorTab = (m.editorTab + 1) % 4
+				m.activeRequest().editorTab = (m.activeRequest().editorTab + 1) % 4
 			case FocusResult:
-				m.resultTab = (m.resultTab + 1) % 4
+				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
 			}
 		case "ctrl+c", "q":
 			m.quitting = true

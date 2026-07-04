@@ -64,11 +64,11 @@ func (m Model) renderUri(uri string, width int, focused bool) string {
 
 func (m Model) renderSidebar(width int, focused bool, height int) string {
 	var rows []string
-	for i, title := range m.requests {
+	for i, req := range m.requests {
 		if i == m.requestCursor {
-			rows = append(rows, styles.ListItemSelectedStyle.Render(title))
+			rows = append(rows, styles.ListItemSelectedStyle.Render(req.title))
 		} else {
-			rows = append(rows, styles.ListItemStyle.Render(title))
+			rows = append(rows, styles.ListItemStyle.Render(req.title))
 		}
 	}
 	if m.namingRequest {

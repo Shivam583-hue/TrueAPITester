@@ -27,6 +27,15 @@ type Cookie struct {
 	Value string
 }
 
+type Requests struct {
+	title     string
+	uri       string
+	method    string
+	response  Response
+	editorTab int
+	resultTab int
+}
+
 type Model struct {
 	quitting bool
 	help     help.Model
@@ -36,12 +45,6 @@ type Model struct {
 	height int
 
 	focused Focus
-
-	uri       string
-	method    string
-	response  Response
-	editorTab int
-	resultTab int
 
 	RequestsWidth  int
 	RequestsHeight int
@@ -55,7 +58,7 @@ type Model struct {
 	ResultWidth  int
 	ResultHeight int
 
-	requests      []string
+	requests      []Requests
 	requestCursor int
 	namingRequest bool
 	nameInput     string

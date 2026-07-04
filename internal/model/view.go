@@ -31,11 +31,11 @@ func (m *Model) View() string {
 		return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, placeholder)
 	}
 
-	Method := m.renderMethod(m.method, methodWidth, m.focused == FocusMethod)
-	Uri := m.renderUri(m.uri, mainWidth-methodWidth, m.focused == FocusUri)
+	Method := m.renderMethod(m.activeRequest().method, methodWidth, m.focused == FocusMethod)
+	Uri := m.renderUri(m.activeRequest().uri, mainWidth-methodWidth, m.focused == FocusUri)
 	UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)
-	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, m.response, m.editorTab)
-	Result := m.renderResult(m.response, m.resultTab, resultWidth, mainHeight, m.focused == FocusResult)
+	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, m.activeRequest().response, m.activeRequest().editorTab)
+	Result := m.renderResult(m.activeRequest().response, m.activeRequest().resultTab, resultWidth, mainHeight, m.focused == FocusResult)
 	EditorandResultContent := lipgloss.JoinHorizontal(lipgloss.Left, Editor, Result)
 
 	UriAndContent := lipgloss.JoinVertical(lipgloss.Top, UriRow, EditorandResultContent)
