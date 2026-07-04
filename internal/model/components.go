@@ -7,9 +7,17 @@ import (
 )
 
 func (m Model) renderEditor(width int, height int, focused bool, resp Response, activeTab int) string {
-	tabs := styles.RenderTabs([]string{"Body", "Headers", "Query", "Auth"}, activeTab)
-
 	var body string
+
+	if activeTab == 0 {
+		body = m.activeRequest().editor.body
+	}
+
+	if body == "" {
+		body = "Enter body text..."
+	}
+
+	tabs := styles.RenderTabs([]string{"Body", "Headers", "Query", "Auth"}, activeTab)
 
 	content := tabs + "\n\n" + body
 

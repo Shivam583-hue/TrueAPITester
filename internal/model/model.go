@@ -65,6 +65,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+
+		// uri
 		if m.focused == FocusUri {
 			switch msg.Type {
 			case tea.KeyRunes:
@@ -80,6 +82,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focused = m.focused.Next()
 			}
 		}
+
+		// Editor tab, body
+		if m.focused == FocusEditor {
+			if m.activeRequest().editorTab == 0 {
+				switch msg.Type {
+				case tea.KeyRunes:
+					m.activeRequest().editor.body += string(msg.Runes)
+				case tea.KeySpace:
+					m.activeRequest().editor.body += string(" ")
+				case tea.KeyBackspace:
+					if len(m.activeRequest().editor.body) > 0 {
+						runes := []rune(m.activeRequest().editor.body)
+						m.activeRequest().editor.body = string(runes[:len(runes)-1])
+					}
+				case tea.KeyEnter:
+					m.activeRequest().editor.body += "\n"
+				}
+			}
+		}
+
 		if m.focused == FocusMethod {
 			switch msg.String() {
 			case "m":
@@ -123,7 +145,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case FocusResult:
 				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
 			}
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 		case "right":

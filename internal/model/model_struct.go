@@ -8,6 +8,30 @@ import (
 
 type Focus int
 
+type AuthType int
+
+const (
+	AuthNone AuthType = iota
+	AuthBearer
+	AuthBasic
+	AuthAPIKey
+)
+
+type Auth struct {
+	authtype AuthType
+
+	// Bearere
+	token string
+
+	// Basic
+	username string
+	password string
+
+	// API
+	keyName  string
+	keyValue string
+}
+
 type Response struct {
 	Status   int
 	Headers  []Header
@@ -15,11 +39,20 @@ type Response struct {
 	Body     string
 	Duration time.Duration
 	Size     int64
+
+	editor Editor
 }
 
 type Header struct {
 	Key   string
 	Value string
+}
+
+type Editor struct {
+	body            string
+	reqHeaders      []Header
+	queryParameters []Header
+	auth            Auth
 }
 
 type Cookie struct {
@@ -34,6 +67,8 @@ type Requests struct {
 	response  Response
 	editorTab int
 	resultTab int
+
+	editor Editor
 }
 
 type Model struct {
