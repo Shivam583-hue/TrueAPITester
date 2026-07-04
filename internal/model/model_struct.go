@@ -36,14 +36,6 @@ type authField struct {
 	value *string
 }
 
-type responseMsg struct {
-	status int
-	body   string
-}
-type responseErr struct {
-	err error
-}
-
 type Auth struct {
 	authtype AuthType
 
@@ -66,6 +58,7 @@ type Response struct {
 	Body     string
 	Duration time.Duration
 	Size     int64
+	Error    string
 
 	editor Editor
 }

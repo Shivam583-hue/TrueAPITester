@@ -3,7 +3,6 @@ package model
 import (
 	"strings"
 
-	httpclient "github.com/Shivam583-hue/TrueAPITester/internal/httpClient"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -77,11 +76,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case responseMsg:
-		r := m.activeRequest()
-		r.response.Status = msg.status
-		r.response.Body = msg.body
+		if msg.index < len(m.requests) {
+			r := &m.requests[msg.index]
+			r.response = Response{
+				Status:   msg.resp.Status,
+				Body:     msg.resp.Body,
+				Duration: msg.resp.Duration,
+				Size:     msg.resp.Size,
+			}
+			for _, h := range msg.resp.Headers {
+				r.response.Headers = append(r.response.Headers, Header{Key: h.Key, Value: h.Value})
+			}
+			for _, c := range msg.resp.Cookies {
+				r.response.Cookies = append(r.response.Cookies, Cookie{Name: c.Key, Value: c.Value})
+			}
+		}
+		return m, nil
 
-	case responseErr:
+	case responseErrMsg:
+		if msg.index < len(m.requests) {
+			m.requests[msg.index].response = Response{Error: msg.err.Error()}
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -283,8 +298,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
 			}
 		case "ctrl+s":
-			req := m.activeRequest()
-			return m, sendRequestCmd(req.method, req.uri)
+			if m.activeRequest() != nil {
+				return m, m.sendRequestCmd()
+			}
 		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
@@ -303,14 +319,4 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 	}
 	return m, nil
-}
-
-func sendRequestCmd(method, url string) tea.Cmd {
-	return func() tea.Msg {
-		status, body, err := httpclient.SendRequest(method, url)
-		if err != nil {
-			return responseErr{err}
-		}
-		return responseMsg{status, body}
-	}
 }

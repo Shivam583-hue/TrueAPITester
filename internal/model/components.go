@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) renderEditor(width int, height int, focused bool, resp Response, activeTab int) string {
@@ -90,13 +91,24 @@ func (m Model) renderResult(resp Response, activeTab int, width, height int, foc
 		}
 		body = strings.Join(rows, "\n\n")
 	case 3: // Cookies
-		// same shape as Headers for now
+		var rows []string
+		for _, c := range resp.Cookies {
+			rows = append(rows, styles.RenderHeaderRow(c.Name, c.Value))
+		}
+		body = strings.Join(rows, "\n\n")
 	}
 
-	status := fmt.Sprintf("Status: %s",
-		styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
+	if resp.Error != "" {
+		body = lipgloss.NewStyle().Foreground(styles.Red).Render("Error: " + resp.Error)
+	}
 
-	content := tabs + "\n\n" + body + "\n\n" + status
+	content := tabs + "\n\n" + body
+	if resp.Status != 0 {
+		status := fmt.Sprintf("Status: %s  Time: %dms  Size: %dB",
+			styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
+			resp.Duration.Milliseconds(), resp.Size)
+		content += "\n\n" + status
+	}
 
 	return styles.TitledPane("Result", content, width, height, focused)
 }
