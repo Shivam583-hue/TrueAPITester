@@ -1,6 +1,8 @@
 package model
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -27,6 +29,33 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case tea.KeyMsg:
+		if m.namingRequest {
+			switch msg.Type {
+			case tea.KeyRunes:
+				m.nameInput += string(msg.Runes)
+			case tea.KeySpace:
+				m.nameInput += " "
+			case tea.KeyBackspace:
+				if len(m.nameInput) > 0 {
+					runes := []rune(m.nameInput)
+					m.nameInput = string(runes[:len(runes)-1])
+				}
+			case tea.KeyEnter:
+				if name := strings.TrimSpace(m.nameInput); name != "" {
+					m.requests = append(m.requests, name)
+					m.requestCursor = len(m.requests) - 1
+				}
+				m.nameInput = ""
+				m.namingRequest = false
+			case tea.KeyEsc:
+				m.nameInput = ""
+				m.namingRequest = false
+			case tea.KeyCtrlC:
+				m.quitting = true
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		if m.focused == FocusUri {
 			switch msg.Type {
 			case tea.KeyRunes:
@@ -55,6 +84,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focused = m.focused.Next()
 			}
 		}
+		if m.focused == FocusSidebar {
+			switch msg.String() {
+			case "n":
+				m.namingRequest = true
+				m.nameInput = ""
+			case "d":
+				if len(m.requests) > 0 {
+					m.requests = append(m.requests[:m.requestCursor], m.requests[m.requestCursor+1:]...)
+					if m.requestCursor >= len(m.requests) && m.requestCursor > 0 {
+						m.requestCursor--
+					}
+				}
+			case "up":
+				if m.requestCursor > 0 {
+					m.requestCursor--
+				}
+			case "down":
+				if m.requestCursor < len(m.requests)-1 {
+					m.requestCursor++
+				}
+			}
+		}
 		switch msg.String() {
 		case "tab":
 			switch m.focused {
@@ -67,9 +118,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "right":
-			m.focused = m.focused.Next()
+			if len(m.requests) > 0 {
+				m.focused = m.focused.Next()
+			}
 		case "left":
-			m.focused = m.focused.Prev()
+			if len(m.requests) > 0 {
+				m.focused = m.focused.Prev()
+			}
 		}
 	}
 

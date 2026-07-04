@@ -1,6 +1,9 @@
 package model
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
+	"github.com/charmbracelet/lipgloss"
+)
 
 func (m *Model) View() string {
 	if v := m.SpecialView(); v != "" {
@@ -18,6 +21,16 @@ func (m *Model) View() string {
 	mainHeight := m.height - uriHeight
 
 	Sidebar := m.renderSidebar(sidebarWidth, m.focused == FocusSidebar, m.height)
+
+	if len(m.requests) == 0 {
+		placeholder := styles.PlaceholderStyle.
+			Width(mainWidth).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render("Press n to create a new request")
+		return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, placeholder)
+	}
+
 	Method := m.renderMethod(m.method, methodWidth, m.focused == FocusMethod)
 	Uri := m.renderUri(m.uri, mainWidth-methodWidth, m.focused == FocusUri)
 	UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)

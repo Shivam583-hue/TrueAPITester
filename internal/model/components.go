@@ -1,8 +1,6 @@
 package model
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
@@ -13,13 +11,7 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 
 	var body string
 
-	status := fmt.Sprintf("Status: %s",
-		styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
-	// status := fmt.Sprintf("Status: %s  Time: %dms  Size: %s",
-	// 	styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
-	// resp.TimeMs, resp.SizeStr)
-
-	content := tabs + "\n\n" + body + "\n\n" + status
+	content := tabs + "\n\n" + body
 
 	return styles.TitledPane("Editor", content, width, height, focused)
 }
@@ -43,13 +35,12 @@ func (m Model) renderResult(resp Response, activeTab int, width, height int, foc
 		// same shape as Headers for now
 	}
 
-	status := fmt.Sprintf("Status: %s",
-		styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
+	// status bar: uncomment and expand when HTTP responses are wired up:
 	// status := fmt.Sprintf("Status: %s  Time: %dms  Size: %s",
-	// 	styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)))
-	// resp.TimeMs, resp.SizeStr)
+	// 	styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
+	// 	resp.TimeMs, resp.SizeStr)
 
-	content := tabs + "\n\n" + body + "\n\n" + status
+	content := tabs + "\n\n" + body
 
 	return styles.TitledPane("Result", content, width, height, focused)
 }
@@ -72,8 +63,18 @@ func (m Model) renderUri(uri string, width int, focused bool) string {
 }
 
 func (m Model) renderSidebar(width int, focused bool, height int) string {
-	text := "haha"
-	style := styles.URLInputStyle
-
-	return styles.TitledPane("Requests", style.Render(text), width, height, focused)
+	var rows []string
+	for i, title := range m.requests {
+		if i == m.requestCursor {
+			rows = append(rows, styles.ListItemSelectedStyle.Render(title))
+		} else {
+			rows = append(rows, styles.ListItemStyle.Render(title))
+		}
+	}
+	if m.namingRequest {
+		rows = append(rows, styles.URLInputStyle.Render("> "+m.nameInput+"█"))
+	} else if len(rows) == 0 {
+		rows = append(rows, styles.PlaceholderStyle.Render("Press n to add a request"))
+	}
+	return styles.TitledPane("Requests", strings.Join(rows, "\n"), width, height, focused)
 }

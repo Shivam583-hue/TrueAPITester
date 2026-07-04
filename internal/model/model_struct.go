@@ -55,7 +55,8 @@ type Model struct {
 	ResultWidth  int
 	ResultHeight int
 
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
+	requests      []string
+	requestCursor int
+	namingRequest bool
+	nameInput     string
 }
