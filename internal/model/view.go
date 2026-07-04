@@ -23,7 +23,7 @@ func (m *Model) View() string {
 
 	Sidebar := m.renderSidebar(sidebarWidth, m.focused == FocusSidebar, m.height)
 
-	if len(m.requests) == 0 {
+	if m.store.Len() == 0 {
 		placeholder := styles.PlaceholderStyle.
 			Width(mainWidth).
 			Height(m.height).
@@ -32,11 +32,12 @@ func (m *Model) View() string {
 		return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, placeholder)
 	}
 
-	Method := m.renderMethod(m.activeRequest().method, methodWidth, m.focused == FocusMethod)
-	Uri := m.renderUri(m.activeRequest().uri, mainWidth-methodWidth, m.focused == FocusUri)
+	r := m.activeRequest()
+	Method := m.renderMethod(r.Method, methodWidth, m.focused == FocusMethod)
+	Uri := m.renderUri(r.URI, mainWidth-methodWidth, m.focused == FocusUri)
 	UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)
-	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, m.activeRequest().response, m.activeRequest().editorTab)
-	Result := m.renderResult(m.activeRequest().response, m.activeRequest().resultTab, resultWidth, mainHeight, m.focused == FocusResult)
+	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, r.EditorTab)
+	Result := m.renderResult(r, resultWidth, mainHeight, m.focused == FocusResult)
 	EditorandResultContent := lipgloss.JoinHorizontal(lipgloss.Left, Editor, Result)
 
 	UriAndContent := lipgloss.JoinVertical(lipgloss.Top, UriRow, EditorandResultContent)

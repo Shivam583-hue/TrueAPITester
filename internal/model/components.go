@@ -5,15 +5,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Shivam583-hue/TrueAPITester/internal/store"
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderEditor(width int, height int, focused bool, resp Response, activeTab int) string {
+func (m Model) renderEditor(width int, height int, focused bool, activeTab int) string {
 	var body string
 	switch activeTab {
 	case 0: // Body
-		body = m.activeRequest().editor.body
+		body = m.activeRequest().Editor.Body
 		if focused {
 			body += "█"
 		}
@@ -22,10 +23,10 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 		}
 
 	case 1, 2: // Headers / Query
-		list := m.activeRequest().editor.reqHeaders
+		list := m.activeRequest().Editor.ReqHeaders
 		itemName := "header"
 		if activeTab == 2 {
-			list = m.activeRequest().editor.queryParameters
+			list = m.activeRequest().Editor.QueryParameters
 			itemName = "query param"
 		}
 		var rows []string
@@ -51,8 +52,8 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 		body = strings.Join(rows, "\n")
 
 	case 3: // Auth
-		a := m.activeRequest().editor.auth
-		rows := []string{styles.ListItemStyle.Render("Type: "+a.authtype.String()) +
+		a := m.activeRequest().Editor.Auth
+		rows := []string{styles.ListItemStyle.Render("Type: "+a.Type.String()) +
 			styles.PlaceholderStyle.Render("  (t to change)")}
 		for i, f := range m.authFields() {
 			line := f.label + ": " + *f.value
@@ -90,7 +91,7 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 
 // resultTabContent builds the unscrolled body for a result tab. Shared by
 // renderResult and the scroll clamping in Update.
-func resultTabContent(resp Response, tab int) string {
+func resultTabContent(resp store.Execution, tab int) string {
 	if resp.Error != "" {
 		return lipgloss.NewStyle().Foreground(styles.Red).Render("Error: " + resp.Error)
 	}
@@ -108,24 +109,30 @@ func resultTabContent(resp Response, tab int) string {
 	case 3: // Cookies
 		var rows []string
 		for _, c := range resp.Cookies {
-			rows = append(rows, styles.RenderHeaderRow(c.Name, c.Value))
+			rows = append(rows, styles.RenderHeaderRow(c.Key, c.Value))
 		}
 		return strings.Join(rows, "\n\n")
 	}
 	return ""
 }
 
-func (m Model) renderResult(resp Response, activeTab int, width, height int, focused bool) string {
+func (m Model) renderResult(r *store.Request, width, height int, focused bool) string {
+	activeTab := r.ResultTab
+	resp := r.CurrentExecution()
+
 	tabs := styles.RenderTabs([]string{"Pretty", "Raw", "Headers", "Cookies"}, activeTab)
 
 	body := resultTabContent(resp, activeTab)
 
 	bodyH := height - 4 // borders + tab row + blank line
 	var status string
-	if resp.Status != 0 {
-		status = fmt.Sprintf("Status: %s  Time: %dms  Size: %dB",
-			styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
-			resp.Duration.Milliseconds(), resp.Size)
+	if len(r.History) > 0 {
+		status = fmt.Sprintf("Run %d/%d  %s", r.HistoryIndex+1, len(r.History), resp.Timestamp.Format("15:04:05"))
+		if resp.Error == "" {
+			status += fmt.Sprintf("   Status: %s  Time: %dms  Size: %dB",
+				styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
+				resp.Duration.Milliseconds(), resp.Size)
+		}
 		bodyH -= 2 // blank line + status bar
 	}
 	body = styles.ScrollView(body, width-2, bodyH, m.resultScroll)
@@ -159,11 +166,11 @@ func (m Model) renderUri(uri string, width int, focused bool) string {
 
 func (m Model) renderSidebar(width int, focused bool, height int) string {
 	var rows []string
-	for i, req := range m.requests {
+	for i, req := range m.store.List() {
 		if i == m.requestCursor {
-			rows = append(rows, styles.ListItemSelectedStyle.Render(req.title))
+			rows = append(rows, styles.ListItemSelectedStyle.Render(req.Title))
 		} else {
-			rows = append(rows, styles.ListItemStyle.Render(req.title))
+			rows = append(rows, styles.ListItemStyle.Render(req.Title))
 		}
 	}
 	if m.namingRequest {

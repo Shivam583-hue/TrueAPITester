@@ -1,8 +1,10 @@
 package model
 
 import (
+	"os"
 	"strings"
 
+	"github.com/Shivam583-hue/TrueAPITester/internal/store"
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,37 +17,69 @@ const (
 var httpMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 func New() *Model {
-	return &Model{}
+	m := &Model{store: store.New()}
+
+	path, err := store.DefaultPath()
+	if err != nil {
+		return m
+	}
+	m.collectionPath = path
+
+	loaded, loadErr := store.Load(path)
+	if loadErr == nil {
+		m.store = loaded
+		return m
+	}
+	if !os.IsNotExist(loadErr) {
+		// Don't let a corrupt collection file silently vanish once we
+		// save a fresh empty store over it.
+		_ = os.Rename(path, path+".bak")
+	}
+	return m
+}
+
+// SaveCollection persists the current collection to disk, if a path is
+// available. Errors are non-fatal: this is a best-effort autosave/manual
+// save, not a transaction the rest of the app depends on.
+func (m *Model) SaveCollection() {
+	if m.collectionPath == "" || m.store == nil {
+		return
+	}
+	_ = m.store.Save(m.collectionPath)
 }
 
 // activeRequest returns the request under the sidebar cursor, or nil when
 // there are no requests. All pane reads/writes should go through this.
-func (m *Model) activeRequest() *Requests {
-	if len(m.requests) == 0 {
+func (m *Model) activeRequest() *store.Request {
+	list := m.store.List()
+	if len(list) == 0 {
 		return nil
 	}
-	return &m.requests[m.requestCursor]
+	if m.requestCursor >= len(list) {
+		m.requestCursor = len(list) - 1
+	}
+	return list[m.requestCursor]
 }
 
 // activeKVList returns the key-value list being edited on the current
 // editor tab: request headers (tab 1) or query parameters (tab 2).
-func (m *Model) activeKVList() *[]Header {
-	if m.activeRequest().editorTab == 2 {
-		return &m.activeRequest().editor.queryParameters
+func (m *Model) activeKVList() *[]store.Header {
+	if m.activeRequest().EditorTab == 2 {
+		return &m.activeRequest().Editor.QueryParameters
 	}
-	return &m.activeRequest().editor.reqHeaders
+	return &m.activeRequest().Editor.ReqHeaders
 }
 
 // authFields returns the editable fields for the active request's auth type.
 func (m *Model) authFields() []authField {
-	a := &m.activeRequest().editor.auth
-	switch a.authtype {
-	case AuthBearer:
-		return []authField{{"Token", &a.token}}
-	case AuthBasic:
-		return []authField{{"Username", &a.username}, {"Password", &a.password}}
-	case AuthAPIKey:
-		return []authField{{"Key Name", &a.keyName}, {"Key Value", &a.keyValue}}
+	a := &m.activeRequest().Editor.Auth
+	switch a.Type {
+	case store.AuthBearer:
+		return []authField{{"Token", &a.Token}}
+	case store.AuthBasic:
+		return []authField{{"Username", &a.Username}, {"Password", &a.Password}}
+	case store.AuthAPIKey:
+		return []authField{{"Key Name", &a.KeyName}, {"Key Value", &a.KeyValue}}
 	}
 	return nil
 }
@@ -61,15 +95,16 @@ func (m *Model) paneBodyHeight() int {
 }
 
 func (m *Model) editorMaxScroll() int {
-	body := m.activeRequest().editor.body + "█"
+	body := m.activeRequest().Editor.Body + "█"
 	return styles.MaxScroll(body, (m.width-sidebarWidth)/2-2, m.paneBodyHeight())
 }
 
 func (m *Model) resultMaxScroll() int {
 	r := m.activeRequest()
-	body := resultTabContent(r.response, r.resultTab)
+	exec := r.CurrentExecution()
+	body := resultTabContent(exec, r.ResultTab)
 	h := m.paneBodyHeight()
-	if r.response.Status != 0 {
+	if len(r.History) > 0 {
 		h -= 2 // status bar + blank line
 	}
 	mainWidth := m.width - sidebarWidth
@@ -103,29 +138,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case responseMsg:
-		if msg.index < len(m.requests) {
-			r := &m.requests[msg.index]
-			r.response = Response{
-				Status:   msg.resp.Status,
-				Body:     msg.resp.Body,
-				Duration: msg.resp.Duration,
-				Size:     msg.resp.Size,
-			}
-			for _, h := range msg.resp.Headers {
-				r.response.Headers = append(r.response.Headers, Header{Key: h.Key, Value: h.Value})
-			}
-			for _, c := range msg.resp.Cookies {
-				r.response.Cookies = append(r.response.Cookies, Cookie{Name: c.Key, Value: c.Value})
-			}
-			if msg.index == m.requestCursor {
-				m.resultScroll = 0
-			}
+		exec := store.Execution{
+			Timestamp: msg.timestamp,
+			Status:    msg.resp.Status,
+			Body:      msg.resp.Body,
+			Duration:  msg.resp.Duration,
+			Size:      msg.resp.Size,
+		}
+		for _, h := range msg.resp.Headers {
+			exec.Headers = append(exec.Headers, store.Header{Key: h.Key, Value: h.Value})
+		}
+		for _, c := range msg.resp.Cookies {
+			exec.Cookies = append(exec.Cookies, store.Header{Key: c.Key, Value: c.Value})
+		}
+		m.store.AppendExecution(msg.id, exec)
+		if cur := m.activeRequest(); cur != nil && cur.ID == msg.id {
+			m.resultScroll = 0
 		}
 		return m, nil
 
 	case responseErrMsg:
-		if msg.index < len(m.requests) {
-			m.requests[msg.index].response = Response{Error: msg.err.Error()}
+		m.store.AppendExecution(msg.id, store.Execution{Timestamp: msg.timestamp, Error: msg.err.Error()})
+		if cur := m.activeRequest(); cur != nil && cur.ID == msg.id {
+			m.resultScroll = 0
 		}
 		return m, nil
 
@@ -143,8 +178,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case tea.KeyEnter:
 				if name := strings.TrimSpace(m.nameInput); name != "" {
-					m.requests = append(m.requests, Requests{title: name, method: "GET"})
-					m.requestCursor = len(m.requests) - 1
+					m.store.CreateRequest(name, "GET")
+					m.requestCursor = m.store.Len() - 1
 					m.editorScroll, m.resultScroll = 0, 0
 				}
 				m.nameInput = ""
@@ -163,11 +198,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.focused == FocusUri {
 			switch msg.Type {
 			case tea.KeyRunes:
-				m.activeRequest().uri += string(msg.Runes)
+				m.activeRequest().URI += string(msg.Runes)
 			case tea.KeyBackspace:
-				if len(m.activeRequest().uri) > 0 {
-					runes := []rune(m.activeRequest().uri)
-					m.activeRequest().uri = string(runes[:len(runes)-1])
+				if len(m.activeRequest().URI) > 0 {
+					runes := []rune(m.activeRequest().URI)
+					m.activeRequest().URI = string(runes[:len(runes)-1])
 				}
 			}
 			switch msg.String() {
@@ -178,7 +213,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Editor pane
 		if m.focused == FocusEditor {
-			switch m.activeRequest().editorTab {
+			switch m.activeRequest().EditorTab {
 			case 0: // Body
 				switch msg.String() {
 				case "up":
@@ -203,9 +238,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch msg.Type {
 					case tea.KeyRunes, tea.KeySpace, tea.KeyBackspace, tea.KeyEnter:
 						if msg.Type == tea.KeyEnter {
-							m.activeRequest().editor.body += "\n"
+							m.activeRequest().Editor.Body += "\n"
 						} else {
-							editString(&m.activeRequest().editor.body, msg)
+							editString(&m.activeRequest().Editor.Body, msg)
 						}
 						// keep the cursor (end of body) visible while typing
 						m.editorScroll = m.editorMaxScroll()
@@ -247,7 +282,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				switch msg.String() {
 				case "n":
-					*list = append(*list, Header{})
+					*list = append(*list, store.Header{})
 					m.kvCursor = len(*list) - 1
 					m.kvEditing = true
 					m.kvOnValue = false
@@ -292,8 +327,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				switch msg.String() {
 				case "t":
-					a := &m.activeRequest().editor.auth
-					a.authtype = (a.authtype + 1) % (AuthAPIKey + 1)
+					a := &m.activeRequest().Editor.Auth
+					a.Type = (a.Type + 1) % (store.AuthAPIKey + 1)
 					m.authCursor = 0
 				case "enter":
 					if len(fields) > 0 {
@@ -315,8 +350,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "m":
 				for i, method := range httpMethods {
-					if method == m.activeRequest().method {
-						m.activeRequest().method = httpMethods[(i+1)%len(httpMethods)]
+					if method == m.activeRequest().Method {
+						m.activeRequest().Method = httpMethods[(i+1)%len(httpMethods)]
 						break
 					}
 				}
@@ -344,6 +379,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if max := m.resultMaxScroll(); m.resultScroll > max {
 					m.resultScroll = max
 				}
+			case "[":
+				if r := m.activeRequest(); r != nil && r.HistoryIndex > 0 {
+					r.HistoryIndex--
+					m.resultScroll = 0
+				}
+			case "]":
+				if r := m.activeRequest(); r != nil && r.HistoryIndex < len(r.History)-1 {
+					r.HistoryIndex++
+					m.resultScroll = 0
+				}
 			}
 		}
 
@@ -353,9 +398,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.namingRequest = true
 				m.nameInput = ""
 			case "d":
-				if len(m.requests) > 0 {
-					m.requests = append(m.requests[:m.requestCursor], m.requests[m.requestCursor+1:]...)
-					if m.requestCursor >= len(m.requests) && m.requestCursor > 0 {
+				if r := m.activeRequest(); r != nil {
+					m.store.Delete(r.ID)
+					if n := m.store.Len(); m.requestCursor >= n && m.requestCursor > 0 {
 						m.requestCursor--
 					}
 					m.editorScroll, m.resultScroll = 0, 0
@@ -366,7 +411,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.editorScroll, m.resultScroll = 0, 0
 				}
 			case "down":
-				if m.requestCursor < len(m.requests)-1 {
+				if m.requestCursor < m.store.Len()-1 {
 					m.requestCursor++
 					m.editorScroll, m.resultScroll = 0, 0
 				}
@@ -376,25 +421,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			switch m.focused {
 			case FocusEditor:
-				m.activeRequest().editorTab = (m.activeRequest().editorTab + 1) % 4
+				m.activeRequest().EditorTab = (m.activeRequest().EditorTab + 1) % 4
 				m.editorScroll = 0
 			case FocusResult:
-				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
+				m.activeRequest().ResultTab = (m.activeRequest().ResultTab + 1) % 4
 				m.resultScroll = 0
 			}
 		case "ctrl+s":
 			if m.activeRequest() != nil {
 				return m, m.sendRequestCmd()
 			}
+		case "ctrl+w":
+			m.SaveCollection()
 		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 		case "right":
-			if len(m.requests) > 0 {
+			if m.store.Len() > 0 {
 				m.focused = m.focused.Next()
 			}
 		case "left":
-			if len(m.requests) > 0 {
+			if m.store.Len() > 0 {
 				m.focused = m.focused.Prev()
 			}
 		}

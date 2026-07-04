@@ -1,94 +1,16 @@
 package model
 
 import (
-	"time"
-
+	"github.com/Shivam583-hue/TrueAPITester/internal/store"
 	"github.com/charmbracelet/bubbles/help"
 )
 
 type Focus int
 
-type AuthType int
-
-const (
-	AuthNone AuthType = iota
-	AuthBearer
-	AuthBasic
-	AuthAPIKey
-)
-
-func (t AuthType) String() string {
-	switch t {
-	case AuthBearer:
-		return "Bearer"
-	case AuthBasic:
-		return "Basic"
-	case AuthAPIKey:
-		return "API Key"
-	default:
-		return "None"
-	}
-}
-
 // authField pairs a display label with a pointer to the string it edits.
 type authField struct {
 	label string
 	value *string
-}
-
-type Auth struct {
-	authtype AuthType
-
-	// Bearere
-	token string
-
-	// Basic
-	username string
-	password string
-
-	// API
-	keyName  string
-	keyValue string
-}
-
-type Response struct {
-	Status   int
-	Headers  []Header
-	Cookies  []Cookie
-	Body     string
-	Duration time.Duration
-	Size     int64
-	Error    string
-
-	editor Editor
-}
-
-type Header struct {
-	Key   string
-	Value string
-}
-
-type Editor struct {
-	body            string
-	reqHeaders      []Header
-	queryParameters []Header
-	auth            Auth
-}
-
-type Cookie struct {
-	Name  string
-	Value string
-}
-
-type Requests struct {
-	title     string
-	uri       string
-	method    string
-	response  Response
-	editorTab int
-	resultTab int
-
-	editor Editor
 }
 
 type Model struct {
@@ -113,10 +35,11 @@ type Model struct {
 	ResultWidth  int
 	ResultHeight int
 
-	requests      []Requests
-	requestCursor int
-	namingRequest bool
-	nameInput     string
+	store          *store.Store
+	collectionPath string
+	requestCursor  int
+	namingRequest  bool
+	nameInput      string
 
 	// key-value editing state (Headers / Query tabs)
 	kvCursor  int

@@ -1,21 +1,26 @@
 package model
 
 import (
+	"time"
+
 	httpclient "github.com/Shivam583-hue/TrueAPITester/internal/httpClient"
+	"github.com/Shivam583-hue/TrueAPITester/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type responseMsg struct {
-	index int
-	resp  httpclient.Response
+	id        store.RequestID
+	timestamp time.Time
+	resp      httpclient.Response
 }
 
 type responseErrMsg struct {
-	index int
-	err   error
+	id        store.RequestID
+	timestamp time.Time
+	err       error
 }
 
-func toKVs(headers []Header) []httpclient.KV {
+func toKVs(headers []store.Header) []httpclient.KV {
 	kvs := make([]httpclient.KV, 0, len(headers))
 	for _, h := range headers {
 		kvs = append(kvs, httpclient.KV{Key: h.Key, Value: h.Value})
@@ -24,33 +29,34 @@ func toKVs(headers []Header) []httpclient.KV {
 }
 
 // sendRequestCmd snapshots the active request and returns a command that
-// sends it in the background, tagged with the request index so the
-// response lands on the right request even if the cursor moves meanwhile.
+// sends it in the background, tagged with the request ID so the response
+// lands on the right request even if it's reordered, or discarded if the
+// request was deleted while the send was in flight.
 func (m *Model) sendRequestCmd() tea.Cmd {
-	index := m.requestCursor
 	r := m.activeRequest()
-	a := r.editor.auth
+	id := r.ID
+	a := r.Editor.Auth
 	req := httpclient.Request{
-		Method:  r.method,
-		URL:     r.uri,
-		Body:    r.editor.body,
-		Headers: toKVs(r.editor.reqHeaders),
-		Query:   toKVs(r.editor.queryParameters),
+		Method:  r.Method,
+		URL:     r.URI,
+		Body:    r.Editor.Body,
+		Headers: toKVs(r.Editor.ReqHeaders),
+		Query:   toKVs(r.Editor.QueryParameters),
 		Auth: httpclient.Auth{
-			// model.AuthType and httpclient.AuthType share the same iota order
-			Type:     httpclient.AuthType(a.authtype),
-			Token:    a.token,
-			Username: a.username,
-			Password: a.password,
-			KeyName:  a.keyName,
-			KeyValue: a.keyValue,
+			// store.AuthType and httpclient.AuthType share the same iota order
+			Type:     httpclient.AuthType(a.Type),
+			Token:    a.Token,
+			Username: a.Username,
+			Password: a.Password,
+			KeyName:  a.KeyName,
+			KeyValue: a.KeyValue,
 		},
 	}
 	return func() tea.Msg {
 		resp, err := httpclient.Send(req)
 		if err != nil {
-			return responseErrMsg{index: index, err: err}
+			return responseErrMsg{id: id, timestamp: time.Now(), err: err}
 		}
-		return responseMsg{index: index, resp: resp}
+		return responseMsg{id: id, timestamp: time.Now(), resp: resp}
 	}
 }

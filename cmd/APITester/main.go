@@ -14,7 +14,11 @@ func main() {
 
 	m := model.New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if fm, ok := finalModel.(*model.Model); ok {
+		fm.SaveCollection()
+	}
+	if err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
