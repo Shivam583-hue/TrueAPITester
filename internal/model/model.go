@@ -3,6 +3,7 @@ package model
 import (
 	"strings"
 
+	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -49,6 +50,32 @@ func (m *Model) authFields() []authField {
 	return nil
 }
 
+// paneBodyHeight returns the lines available for scrollable body content in
+// the editor/result panes: total minus uri row, borders, tab row, blank line.
+func (m *Model) paneBodyHeight() int {
+	h := m.height - uriHeight - 4
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+func (m *Model) editorMaxScroll() int {
+	body := m.activeRequest().editor.body + "█"
+	return styles.MaxScroll(body, (m.width-sidebarWidth)/2-2, m.paneBodyHeight())
+}
+
+func (m *Model) resultMaxScroll() int {
+	r := m.activeRequest()
+	body := resultTabContent(r.response, r.resultTab)
+	h := m.paneBodyHeight()
+	if r.response.Status != 0 {
+		h -= 2 // status bar + blank line
+	}
+	mainWidth := m.width - sidebarWidth
+	return styles.MaxScroll(body, mainWidth-mainWidth/2-2, h)
+}
+
 // editString applies rune/space/backspace input to a string field.
 func editString(s *string, msg tea.KeyMsg) {
 	switch msg.Type {
@@ -90,6 +117,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for _, c := range msg.resp.Cookies {
 				r.response.Cookies = append(r.response.Cookies, Cookie{Name: c.Key, Value: c.Value})
 			}
+			if msg.index == m.requestCursor {
+				m.resultScroll = 0
+			}
 		}
 		return m, nil
 
@@ -115,6 +145,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if name := strings.TrimSpace(m.nameInput); name != "" {
 					m.requests = append(m.requests, Requests{title: name, method: "GET"})
 					m.requestCursor = len(m.requests) - 1
+					m.editorScroll, m.resultScroll = 0, 0
 				}
 				m.nameInput = ""
 				m.namingRequest = false
@@ -149,10 +180,36 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.focused == FocusEditor {
 			switch m.activeRequest().editorTab {
 			case 0: // Body
-				if msg.Type == tea.KeyEnter {
-					m.activeRequest().editor.body += "\n"
-				} else {
-					editString(&m.activeRequest().editor.body, msg)
+				switch msg.String() {
+				case "up":
+					if m.editorScroll > 0 {
+						m.editorScroll--
+					}
+				case "down":
+					if m.editorScroll < m.editorMaxScroll() {
+						m.editorScroll++
+					}
+				case "pgup":
+					m.editorScroll -= m.paneBodyHeight()
+					if m.editorScroll < 0 {
+						m.editorScroll = 0
+					}
+				case "pgdown":
+					m.editorScroll += m.paneBodyHeight()
+					if max := m.editorMaxScroll(); m.editorScroll > max {
+						m.editorScroll = max
+					}
+				default:
+					switch msg.Type {
+					case tea.KeyRunes, tea.KeySpace, tea.KeyBackspace, tea.KeyEnter:
+						if msg.Type == tea.KeyEnter {
+							m.activeRequest().editor.body += "\n"
+						} else {
+							editString(&m.activeRequest().editor.body, msg)
+						}
+						// keep the cursor (end of body) visible while typing
+						m.editorScroll = m.editorMaxScroll()
+					}
 				}
 
 			case 1, 2: // Headers / Query
@@ -267,6 +324,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focused = m.focused.Next()
 			}
 		}
+		if m.focused == FocusResult {
+			switch msg.String() {
+			case "up":
+				if m.resultScroll > 0 {
+					m.resultScroll--
+				}
+			case "down":
+				if m.resultScroll < m.resultMaxScroll() {
+					m.resultScroll++
+				}
+			case "pgup":
+				m.resultScroll -= m.paneBodyHeight()
+				if m.resultScroll < 0 {
+					m.resultScroll = 0
+				}
+			case "pgdown":
+				m.resultScroll += m.paneBodyHeight()
+				if max := m.resultMaxScroll(); m.resultScroll > max {
+					m.resultScroll = max
+				}
+			}
+		}
+
 		if m.focused == FocusSidebar {
 			switch msg.String() {
 			case "n":
@@ -278,14 +358,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.requestCursor >= len(m.requests) && m.requestCursor > 0 {
 						m.requestCursor--
 					}
+					m.editorScroll, m.resultScroll = 0, 0
 				}
 			case "up":
 				if m.requestCursor > 0 {
 					m.requestCursor--
+					m.editorScroll, m.resultScroll = 0, 0
 				}
 			case "down":
 				if m.requestCursor < len(m.requests)-1 {
 					m.requestCursor++
+					m.editorScroll, m.resultScroll = 0, 0
 				}
 			}
 		}
@@ -294,8 +377,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.focused {
 			case FocusEditor:
 				m.activeRequest().editorTab = (m.activeRequest().editorTab + 1) % 4
+				m.editorScroll = 0
 			case FocusResult:
 				m.activeRequest().resultTab = (m.activeRequest().resultTab + 1) % 4
+				m.resultScroll = 0
 			}
 		case "ctrl+s":
 			if m.activeRequest() != nil {

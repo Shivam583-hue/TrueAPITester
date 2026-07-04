@@ -68,6 +68,19 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 		body = strings.Join(rows, "\n")
 	}
 
+	bodyH := height - 4 // borders + tab row + blank line
+	offset := 0
+	switch activeTab {
+	case 0:
+		offset = m.editorScroll
+	case 1, 2:
+		// keep the key-value cursor visible
+		if m.kvCursor >= bodyH {
+			offset = m.kvCursor - bodyH + 1
+		}
+	}
+	body = styles.ScrollView(body, width-2, bodyH, offset)
+
 	tabs := styles.RenderTabs([]string{"Body", "Headers", "Query", "Auth"}, activeTab)
 
 	content := tabs + "\n\n" + body
@@ -75,38 +88,50 @@ func (m Model) renderEditor(width int, height int, focused bool, resp Response, 
 	return styles.TitledPane("Editor", content, width, height, focused)
 }
 
-func (m Model) renderResult(resp Response, activeTab int, width, height int, focused bool) string {
-	tabs := styles.RenderTabs([]string{"Pretty", "Raw", "Headers", "Cookies"}, activeTab)
-
-	var body string
-	switch activeTab {
+// resultTabContent builds the unscrolled body for a result tab. Shared by
+// renderResult and the scroll clamping in Update.
+func resultTabContent(resp Response, tab int) string {
+	if resp.Error != "" {
+		return lipgloss.NewStyle().Foreground(styles.Red).Render("Error: " + resp.Error)
+	}
+	switch tab {
 	case 0: // Pretty
-		body = highlightJSON(resp.Body) // tokenizer + JSON*Style
+		return highlightJSON(resp.Body)
 	case 1: // Raw
-		body = resp.Body
+		return resp.Body
 	case 2: // Headers
 		var rows []string
 		for _, h := range resp.Headers {
 			rows = append(rows, styles.RenderHeaderRow(h.Key, h.Value))
 		}
-		body = strings.Join(rows, "\n\n")
+		return strings.Join(rows, "\n\n")
 	case 3: // Cookies
 		var rows []string
 		for _, c := range resp.Cookies {
 			rows = append(rows, styles.RenderHeaderRow(c.Name, c.Value))
 		}
-		body = strings.Join(rows, "\n\n")
+		return strings.Join(rows, "\n\n")
 	}
+	return ""
+}
 
-	if resp.Error != "" {
-		body = lipgloss.NewStyle().Foreground(styles.Red).Render("Error: " + resp.Error)
-	}
+func (m Model) renderResult(resp Response, activeTab int, width, height int, focused bool) string {
+	tabs := styles.RenderTabs([]string{"Pretty", "Raw", "Headers", "Cookies"}, activeTab)
 
-	content := tabs + "\n\n" + body
+	body := resultTabContent(resp, activeTab)
+
+	bodyH := height - 4 // borders + tab row + blank line
+	var status string
 	if resp.Status != 0 {
-		status := fmt.Sprintf("Status: %s  Time: %dms  Size: %dB",
+		status = fmt.Sprintf("Status: %s  Time: %dms  Size: %dB",
 			styles.StatusCodeStyle(resp.Status).Render(strconv.Itoa(resp.Status)),
 			resp.Duration.Milliseconds(), resp.Size)
+		bodyH -= 2 // blank line + status bar
+	}
+	body = styles.ScrollView(body, width-2, bodyH, m.resultScroll)
+
+	content := tabs + "\n\n" + body
+	if status != "" {
 		content += "\n\n" + status
 	}
 

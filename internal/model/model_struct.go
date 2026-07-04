@@ -126,4 +126,8 @@ type Model struct {
 	// auth editing state
 	authCursor  int
 	authEditing bool
+
+	// scroll offsets for the editor Body tab and the result pane
+	editorScroll int
+	resultScroll int
 }

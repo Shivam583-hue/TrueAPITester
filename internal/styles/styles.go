@@ -146,11 +146,53 @@ func TitledPane(title, body string, width, height int, focused bool) string {
 		Render(body)
 
 	rows := strings.Split(content, "\n")
+	// hard clip: lipgloss Height pads short content but never cuts long
+	// content, so overflowing rows would break the pane layout
+	if maxRows := height - 2; maxRows >= 0 && len(rows) > maxRows {
+		rows = rows[:maxRows]
+	}
 	for i, r := range rows {
 		rows[i] = border.Render(b.Left) + r + border.Render(b.Right)
 	}
 
 	return top + "\n" + strings.Join(rows, "\n") + "\n" + bottom
+}
+
+// ScrollView wraps body to width, then returns the window of height lines
+// starting at offset (clamped to the content).
+func ScrollView(body string, width, height, offset int) string {
+	if width < 1 || height < 1 {
+		return ""
+	}
+	lines := strings.Split(lipgloss.NewStyle().Width(width).Render(body), "\n")
+	max := len(lines) - height
+	if max < 0 {
+		max = 0
+	}
+	if offset > max {
+		offset = max
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + height
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return strings.Join(lines[offset:end], "\n")
+}
+
+// MaxScroll returns the largest useful scroll offset for body wrapped to
+// width in a window of height lines.
+func MaxScroll(body string, width, height int) int {
+	if width < 1 {
+		return 0
+	}
+	n := strings.Count(lipgloss.NewStyle().Width(width).Render(body), "\n") + 1
+	if max := n - height; max > 0 {
+		return max
+	}
+	return 0
 }
 
 var ModeColors = map[string]lipgloss.Color{

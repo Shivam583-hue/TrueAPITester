@@ -5,15 +5,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	sidebarWidth = 30
+	methodWidth  = 12
+	uriHeight    = 3
+)
+
 func (m *Model) View() string {
 	if v := m.SpecialView(); v != "" {
 		return v
 	}
-	const (
-		sidebarWidth = 30
-		methodWidth  = 12
-		uriHeight    = 3
-	)
 
 	mainWidth := m.width - sidebarWidth
 	editorWidth := mainWidth / 2
