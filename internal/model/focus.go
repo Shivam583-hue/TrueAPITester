@@ -2,6 +2,7 @@ package model
 
 const (
 	FocusSidebar Focus = iota
+	FocusMethod
 	FocusUri
 	FocusEditor
 	FocusResult
@@ -11,6 +12,8 @@ func (f Focus) String() string {
 	switch f {
 	case FocusSidebar:
 		return "Sidebar"
+	case FocusMethod:
+		return "Method"
 	case FocusUri:
 		return "Uri"
 	case FocusEditor:

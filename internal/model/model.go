@@ -9,8 +9,10 @@ const (
 	minHeight = 24
 )
 
+var httpMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+
 func New() *Model {
-	return &Model{}
+	return &Model{method: "GET"}
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -36,6 +38,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			switch msg.String() {
+			case "enter":
+				m.focused = m.focused.Next()
+			}
+		}
+		if m.focused == FocusMethod {
+			switch msg.String() {
+			case "m":
+				for i, method := range httpMethods {
+					if method == m.method {
+						m.method = httpMethods[(i+1)%len(httpMethods)]
+						break
+					}
+				}
 			case "enter":
 				m.focused = m.focused.Next()
 			}

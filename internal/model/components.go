@@ -54,6 +54,11 @@ func (m Model) renderResult(resp Response, activeTab int, width, height int, foc
 	return styles.TitledPane("Result", content, width, height, focused)
 }
 
+func (m Model) renderMethod(method string, width int, focused bool) string {
+	text := styles.MethodStyle(method).Render(method)
+	return styles.TitledPane("Method", text, width, 3, focused)
+}
+
 func (m Model) renderUri(uri string, width int, focused bool) string {
 	text := uri
 	style := styles.URLInputStyle

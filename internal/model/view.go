@@ -8,6 +8,7 @@ func (m *Model) View() string {
 	}
 	const (
 		sidebarWidth = 30
+		methodWidth  = 12
 		uriHeight    = 3
 	)
 
@@ -17,12 +18,14 @@ func (m *Model) View() string {
 	mainHeight := m.height - uriHeight
 
 	Sidebar := m.renderSidebar(sidebarWidth, m.focused == FocusSidebar, m.height)
-	Uri := m.renderUri(m.uri, mainWidth, m.focused == FocusUri)
+	Method := m.renderMethod(m.method, methodWidth, m.focused == FocusMethod)
+	Uri := m.renderUri(m.uri, mainWidth-methodWidth, m.focused == FocusUri)
+	UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)
 	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, m.response, m.editorTab)
 	Result := m.renderResult(m.response, m.resultTab, resultWidth, mainHeight, m.focused == FocusResult)
 	EditorandResultContent := lipgloss.JoinHorizontal(lipgloss.Left, Editor, Result)
 
-	UriAndContent := lipgloss.JoinVertical(lipgloss.Top, Uri, EditorandResultContent)
+	UriAndContent := lipgloss.JoinVertical(lipgloss.Top, UriRow, EditorandResultContent)
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, UriAndContent)
 }

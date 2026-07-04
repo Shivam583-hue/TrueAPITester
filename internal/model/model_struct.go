@@ -38,6 +38,7 @@ type Model struct {
 	focused Focus
 
 	uri       string
+	method    string
 	response  Response
 	editorTab int
 	resultTab int
