@@ -109,10 +109,27 @@ func (r *Request) CurrentExecution() Execution {
 // *Request returned by Get/List happen directly, since callers only ever
 // mutate from Bubble Tea's single Update goroutine.
 type Store struct {
-	mu     sync.Mutex
-	nextID RequestID
-	order  []RequestID
-	byID   map[RequestID]*Request
+	mu        sync.Mutex
+	nextID    RequestID
+	order     []RequestID
+	byID      map[RequestID]*Request
+	onboarded bool
+}
+
+// Onboarded reports whether the user has already been shown the app's
+// first-run help screen.
+func (s *Store) Onboarded() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.onboarded
+}
+
+// SetOnboarded marks the first-run help screen as seen, so it won't
+// auto-expand again once this is persisted.
+func (s *Store) SetOnboarded(v bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onboarded = v
 }
 
 func New() *Store {
@@ -182,15 +199,16 @@ func (s *Store) AppendExecution(id RequestID, exec Execution) {
 }
 
 type persistedFile struct {
-	NextID   RequestID `json:"nextId"`
-	Requests []Request `json:"requests"`
+	NextID    RequestID `json:"nextId"`
+	Onboarded bool      `json:"onboarded"`
+	Requests  []Request `json:"requests"`
 }
 
 // Save writes the collection to path as JSON, creating parent directories
 // as needed.
 func (s *Store) Save(path string) error {
 	s.mu.Lock()
-	pf := persistedFile{NextID: s.nextID}
+	pf := persistedFile{NextID: s.nextID, Onboarded: s.onboarded}
 	for _, id := range s.order {
 		pf.Requests = append(pf.Requests, *s.byID[id])
 	}
@@ -219,6 +237,7 @@ func Load(path string) (*Store, error) {
 	}
 	s := New()
 	s.nextID = pf.NextID
+	s.onboarded = pf.Onboarded
 	for _, r := range pf.Requests {
 		req := r
 		req.HistoryIndex = len(req.History) - 1

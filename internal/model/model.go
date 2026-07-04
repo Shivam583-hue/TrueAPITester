@@ -17,113 +17,25 @@ const (
 var httpMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
 func New() *Model {
-	m := &Model{store: store.New()}
+	m := &Model{store: store.New(), help: newHelpModel()}
 
 	path, err := store.DefaultPath()
-	if err != nil {
-		return m
-	}
-	m.collectionPath = path
-
-	loaded, loadErr := store.Load(path)
-	if loadErr == nil {
-		m.store = loaded
-		return m
-	}
-	if !os.IsNotExist(loadErr) {
-		// Don't let a corrupt collection file silently vanish once we
-		// save a fresh empty store over it.
-		_ = os.Rename(path, path+".bak")
-	}
-	return m
-}
-
-// SaveCollection persists the current collection to disk, if a path is
-// available. Errors are non-fatal: this is a best-effort autosave/manual
-// save, not a transaction the rest of the app depends on.
-func (m *Model) SaveCollection() {
-	if m.collectionPath == "" || m.store == nil {
-		return
-	}
-	_ = m.store.Save(m.collectionPath)
-}
-
-// activeRequest returns the request under the sidebar cursor, or nil when
-// there are no requests. All pane reads/writes should go through this.
-func (m *Model) activeRequest() *store.Request {
-	list := m.store.List()
-	if len(list) == 0 {
-		return nil
-	}
-	if m.requestCursor >= len(list) {
-		m.requestCursor = len(list) - 1
-	}
-	return list[m.requestCursor]
-}
-
-// activeKVList returns the key-value list being edited on the current
-// editor tab: request headers (tab 1) or query parameters (tab 2).
-func (m *Model) activeKVList() *[]store.Header {
-	if m.activeRequest().EditorTab == 2 {
-		return &m.activeRequest().Editor.QueryParameters
-	}
-	return &m.activeRequest().Editor.ReqHeaders
-}
-
-// authFields returns the editable fields for the active request's auth type.
-func (m *Model) authFields() []authField {
-	a := &m.activeRequest().Editor.Auth
-	switch a.Type {
-	case store.AuthBearer:
-		return []authField{{"Token", &a.Token}}
-	case store.AuthBasic:
-		return []authField{{"Username", &a.Username}, {"Password", &a.Password}}
-	case store.AuthAPIKey:
-		return []authField{{"Key Name", &a.KeyName}, {"Key Value", &a.KeyValue}}
-	}
-	return nil
-}
-
-// paneBodyHeight returns the lines available for scrollable body content in
-// the editor/result panes: total minus uri row, borders, tab row, blank line.
-func (m *Model) paneBodyHeight() int {
-	h := m.height - uriHeight - 4
-	if h < 1 {
-		h = 1
-	}
-	return h
-}
-
-func (m *Model) editorMaxScroll() int {
-	body := m.activeRequest().Editor.Body + "█"
-	return styles.MaxScroll(body, (m.width-sidebarWidth)/2-2, m.paneBodyHeight())
-}
-
-func (m *Model) resultMaxScroll() int {
-	r := m.activeRequest()
-	exec := r.CurrentExecution()
-	body := resultTabContent(exec, r.ResultTab)
-	h := m.paneBodyHeight()
-	if len(r.History) > 0 {
-		h -= 2 // status bar + blank line
-	}
-	mainWidth := m.width - sidebarWidth
-	return styles.MaxScroll(body, mainWidth-mainWidth/2-2, h)
-}
-
-// editString applies rune/space/backspace input to a string field.
-func editString(s *string, msg tea.KeyMsg) {
-	switch msg.Type {
-	case tea.KeyRunes:
-		*s += string(msg.Runes)
-	case tea.KeySpace:
-		*s += " "
-	case tea.KeyBackspace:
-		if len(*s) > 0 {
-			runes := []rune(*s)
-			*s = string(runes[:len(runes)-1])
+	if err == nil {
+		m.collectionPath = path
+		if loaded, loadErr := store.Load(path); loadErr == nil {
+			m.store = loaded
+		} else if !os.IsNotExist(loadErr) {
+			// Don't let a corrupt collection file silently vanish once we
+			// save a fresh empty store over it.
+			_ = os.Rename(path, path+".bak")
 		}
 	}
+
+	// Auto-expand the full help screen exactly once: the first time this
+	// user's collection file didn't already mark them as onboarded.
+	m.help.ShowAll = !m.store.Onboarded()
+	m.store.SetOnboarded(true)
+	return m
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -136,6 +48,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		// -2 for the help bar's own left/right padding, so its wrapping
+		// matches the width it's actually rendered at.
+		if w := msg.Width - 2; w > 0 {
+			m.help.Width = w
+		} else {
+			m.help.Width = 0
+		}
 
 	case responseMsg:
 		exec := store.Execution{
@@ -433,6 +352,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "ctrl+w":
 			m.SaveCollection()
+		case "?":
+			if !m.isTypingText() {
+				m.help.ShowAll = !m.help.ShowAll
+			}
 		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
@@ -451,4 +374,92 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loaded = true
 	}
 	return m, nil
+}
+
+// editString applies rune/space/backspace input to a string field.
+func editString(s *string, msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyRunes:
+		*s += string(msg.Runes)
+	case tea.KeySpace:
+		*s += " "
+	case tea.KeyBackspace:
+		if len(*s) > 0 {
+			runes := []rune(*s)
+			*s = string(runes[:len(runes)-1])
+		}
+	}
+}
+
+// SaveCollection persists the current collection to disk, if a path is
+// available. Errors are non-fatal: this is a best-effort autosave/manual
+// save, not a transaction the rest of the app depends on.
+func (m *Model) SaveCollection() {
+	if m.collectionPath == "" || m.store == nil {
+		return
+	}
+	_ = m.store.Save(m.collectionPath)
+}
+
+// activeRequest returns the request under the sidebar cursor
+func (m *Model) activeRequest() *store.Request {
+	list := m.store.List()
+	if len(list) == 0 {
+		return nil
+	}
+	if m.requestCursor >= len(list) {
+		m.requestCursor = len(list) - 1
+	}
+	return list[m.requestCursor]
+}
+
+// activeKVList returns the key-value list being edited on the current
+// editor tab: request headers (tab 1) or query parameters (tab 2).
+func (m *Model) activeKVList() *[]store.Header {
+	if m.activeRequest().EditorTab == 2 {
+		return &m.activeRequest().Editor.QueryParameters
+	}
+	return &m.activeRequest().Editor.ReqHeaders
+}
+
+// authFields returns the editable fields for the active request's auth type.
+func (m *Model) authFields() []authField {
+	a := &m.activeRequest().Editor.Auth
+	switch a.Type {
+	case store.AuthBearer:
+		return []authField{{"Token", &a.Token}}
+	case store.AuthBasic:
+		return []authField{{"Username", &a.Username}, {"Password", &a.Password}}
+	case store.AuthAPIKey:
+		return []authField{{"Key Name", &a.KeyName}, {"Key Value", &a.KeyValue}}
+	}
+	return nil
+}
+
+// paneBodyHeight returns the lines available for scrollable body content in
+// the editor/result panes: total minus uri row, help bar, borders, tab row,
+// blank line.
+func (m *Model) paneBodyHeight() int {
+	h := m.height - uriHeight - m.helpHeight() - 4
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+func (m *Model) editorMaxScroll() int {
+	body := m.activeRequest().Editor.Body + "█"
+	return styles.MaxScroll(body, (m.width-sidebarWidth)/2-2, m.paneBodyHeight())
+}
+
+func (m *Model) resultMaxScroll() int {
+	r := m.activeRequest()
+	exec := r.CurrentExecution()
+	body := resultTabContent(exec, r.ResultTab)
+	h := m.paneBodyHeight()
+	if len(r.History) > 0 {
+		h -= 2 // status bar + blank line
+	}
+	mainWidth := m.width - sidebarWidth
+	return styles.MaxScroll(body, mainWidth-mainWidth/2-2, h)
 }

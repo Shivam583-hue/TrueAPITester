@@ -1,6 +1,8 @@
 package model
 
 import (
+	"strings"
+
 	"github.com/Shivam583-hue/TrueAPITester/internal/styles"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -16,31 +18,37 @@ func (m *Model) View() string {
 		return v
 	}
 
+	helpBar := styles.HelpBarStyle.Width(m.width).Render(m.helpView())
+	helpLines := strings.Count(helpBar, "\n") + 1
+
 	mainWidth := m.width - sidebarWidth
 	editorWidth := mainWidth / 2
 	resultWidth := mainWidth - editorWidth
-	mainHeight := m.height - uriHeight
+	bodyHeight := m.height - helpLines
+	mainHeight := bodyHeight - uriHeight
 
-	Sidebar := m.renderSidebar(sidebarWidth, m.focused == FocusSidebar, m.height)
+	Sidebar := m.renderSidebar(sidebarWidth, m.focused == FocusSidebar, bodyHeight)
 
+	var main string
 	if m.store.Len() == 0 {
 		placeholder := styles.PlaceholderStyle.
 			Width(mainWidth).
-			Height(m.height).
+			Height(bodyHeight).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("Press n to create a new request")
-		return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, placeholder)
+		main = lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, placeholder)
+	} else {
+		r := m.activeRequest()
+		Method := m.renderMethod(r.Method, methodWidth, m.focused == FocusMethod)
+		Uri := m.renderUri(r.URI, mainWidth-methodWidth, m.focused == FocusUri)
+		UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)
+		Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, r.EditorTab)
+		Result := m.renderResult(r, resultWidth, mainHeight, m.focused == FocusResult)
+		EditorandResultContent := lipgloss.JoinHorizontal(lipgloss.Left, Editor, Result)
+
+		UriAndContent := lipgloss.JoinVertical(lipgloss.Top, UriRow, EditorandResultContent)
+		main = lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, UriAndContent)
 	}
 
-	r := m.activeRequest()
-	Method := m.renderMethod(r.Method, methodWidth, m.focused == FocusMethod)
-	Uri := m.renderUri(r.URI, mainWidth-methodWidth, m.focused == FocusUri)
-	UriRow := lipgloss.JoinHorizontal(lipgloss.Left, Method, Uri)
-	Editor := m.renderEditor(editorWidth, mainHeight, m.focused == FocusEditor, r.EditorTab)
-	Result := m.renderResult(r, resultWidth, mainHeight, m.focused == FocusResult)
-	EditorandResultContent := lipgloss.JoinHorizontal(lipgloss.Left, Editor, Result)
-
-	UriAndContent := lipgloss.JoinVertical(lipgloss.Top, UriRow, EditorandResultContent)
-
-	return lipgloss.JoinHorizontal(lipgloss.Left, Sidebar, UriAndContent)
+	return lipgloss.JoinVertical(lipgloss.Top, main, helpBar)
 }

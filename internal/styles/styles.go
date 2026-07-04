@@ -257,6 +257,10 @@ var (
 	JSONPunctStyle  = lipgloss.NewStyle().Foreground(Overlay0)
 )
 
+var HelpBarStyle = lipgloss.NewStyle().
+	Background(Mantle).
+	Padding(0, 1)
+
 var TooSmallStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("196")).
 	Bold(true).
