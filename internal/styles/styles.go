@@ -258,8 +258,12 @@ var (
 )
 
 var HelpBarStyle = lipgloss.NewStyle().
-	Background(Mantle).
-	Padding(0, 1)
+	Background(Base).
+	Padding(0, 1).
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderTop(true).
+	BorderForeground(Surface1).
+	BorderBackground(Base)
 
 var TooSmallStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("196")).

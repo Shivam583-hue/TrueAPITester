@@ -1,6 +1,3 @@
-// Package store owns the request collection: definitions, auth/editor
-// state, and per-request execution history. It has no dependency on the
-// UI layer, and can be persisted to and restored from a JSON file.
 package store
 
 import (

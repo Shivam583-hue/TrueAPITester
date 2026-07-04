@@ -25,14 +25,10 @@ func New() *Model {
 		if loaded, loadErr := store.Load(path); loadErr == nil {
 			m.store = loaded
 		} else if !os.IsNotExist(loadErr) {
-			// Don't let a corrupt collection file silently vanish once we
-			// save a fresh empty store over it.
 			_ = os.Rename(path, path+".bak")
 		}
 	}
 
-	// Auto-expand the full help screen exactly once: the first time this
-	// user's collection file didn't already mark them as onboarded.
 	m.help.ShowAll = !m.store.Onboarded()
 	m.store.SetOnboarded(true)
 	return m
@@ -48,8 +44,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// -2 for the help bar's own left/right padding, so its wrapping
-		// matches the width it's actually rendered at.
 		if w := msg.Width - 2; w > 0 {
 			m.help.Width = w
 		} else {
@@ -436,9 +430,6 @@ func (m *Model) authFields() []authField {
 	return nil
 }
 
-// paneBodyHeight returns the lines available for scrollable body content in
-// the editor/result panes: total minus uri row, help bar, borders, tab row,
-// blank line.
 func (m *Model) paneBodyHeight() int {
 	h := m.height - uriHeight - m.helpHeight() - 4
 	if h < 1 {

@@ -18,7 +18,7 @@ func (m *Model) View() string {
 		return v
 	}
 
-	helpBar := styles.HelpBarStyle.Width(m.width).Render(m.helpView())
+	helpBar := m.helpBar()
 	helpLines := strings.Count(helpBar, "\n") + 1
 
 	mainWidth := m.width - sidebarWidth

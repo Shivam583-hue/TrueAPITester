@@ -89,8 +89,6 @@ func (m Model) renderEditor(width int, height int, focused bool, activeTab int) 
 	return styles.TitledPane("Editor", content, width, height, focused)
 }
 
-// resultTabContent builds the unscrolled body for a result tab. Shared by
-// renderResult and the scroll clamping in Update.
 func resultTabContent(resp store.Execution, tab int) string {
 	if resp.Error != "" {
 		return lipgloss.NewStyle().Foreground(styles.Red).Render("Error: " + resp.Error)

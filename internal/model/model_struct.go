@@ -7,7 +7,6 @@ import (
 
 type Focus int
 
-// authField pairs a display label with a pointer to the string it edits.
 type authField struct {
 	label string
 	value *string
@@ -41,16 +40,13 @@ type Model struct {
 	namingRequest  bool
 	nameInput      string
 
-	// key-value editing state (Headers / Query tabs)
 	kvCursor  int
 	kvEditing bool
 	kvOnValue bool
 
-	// auth editing state
 	authCursor  int
 	authEditing bool
 
-	// scroll offsets for the editor Body tab and the result pane
 	editorScroll int
 	resultScroll int
 }

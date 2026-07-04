@@ -28,10 +28,6 @@ func toKVs(headers []store.Header) []httpclient.KV {
 	return kvs
 }
 
-// sendRequestCmd snapshots the active request and returns a command that
-// sends it in the background, tagged with the request ID so the response
-// lands on the right request even if it's reordered, or discarded if the
-// request was deleted while the send was in flight.
 func (m *Model) sendRequestCmd() tea.Cmd {
 	r := m.activeRequest()
 	id := r.ID
@@ -43,7 +39,6 @@ func (m *Model) sendRequestCmd() tea.Cmd {
 		Headers: toKVs(r.Editor.ReqHeaders),
 		Query:   toKVs(r.Editor.QueryParameters),
 		Auth: httpclient.Auth{
-			// store.AuthType and httpclient.AuthType share the same iota order
 			Type:     httpclient.AuthType(a.Type),
 			Token:    a.Token,
 			Username: a.Username,

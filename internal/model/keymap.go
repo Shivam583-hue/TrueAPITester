@@ -28,8 +28,6 @@ var (
 	keyQuit      = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 )
 
-// keyMap renders context-sensitive help: which bindings are relevant
-// depends on which pane is focused and, within the editor, which tab.
 type keyMap struct {
 	focused     Focus
 	editorTab   int
@@ -63,12 +61,11 @@ func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{keyFocusNext, keyFocusPrev, keyTab, keyUpDown},
 		{keyNew, keyDelete, keyEnter, keyEsc},
-		{keyMethod, keyAuthType, keyHistory},
+		{keyMethod, keyAuthType, keyHistory, keyScroll},
 		{keySend, keySave, keyHelp, keyQuit},
 	}
 }
 
-// newHelpModel builds a help.Model themed to match the app's palette.
 func newHelpModel() help.Model {
 	h := help.New()
 	h.Styles.ShortKey = lipgloss.NewStyle().Foreground(styles.Peach).Bold(true)
@@ -81,7 +78,6 @@ func newHelpModel() help.Model {
 	return h
 }
 
-// helpKeyMap builds the keyMap for the current UI state.
 func (m *Model) helpKeyMap() keyMap {
 	var editorTab int
 	if r := m.activeRequest(); r != nil {
@@ -90,18 +86,17 @@ func (m *Model) helpKeyMap() keyMap {
 	return keyMap{focused: m.focused, editorTab: editorTab, hasRequests: m.store.Len() > 0}
 }
 
-func (m *Model) helpView() string {
-	return m.help.View(m.helpKeyMap())
+// helpBar renders the fully styled help bar (border, background, width) for
+// the current terminal width and UI state.
+func (m *Model) helpBar() string {
+	content := m.help.View(m.helpKeyMap())
+	return styles.HelpBarStyle.Width(m.width).Render(content)
 }
 
-// helpHeight is how many terminal rows the help bar currently occupies, so
-// the rest of the layout can reserve space for it.
 func (m *Model) helpHeight() int {
-	return strings.Count(m.helpView(), "\n") + 1
+	return strings.Count(m.helpBar(), "\n") + 1
 }
 
-// isTypingText reports whether the current focus is a free-text field
-// where "?" should be typed literally rather than toggling help.
 func (m *Model) isTypingText() bool {
 	if m.focused == FocusUri {
 		return true
