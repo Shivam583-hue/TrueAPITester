@@ -9,12 +9,61 @@ import (
 func (m Model) renderEditor(width int, height int, focused bool, resp Response, activeTab int) string {
 	var body string
 
-	if activeTab == 0 {
+	switch activeTab {
+	case 0: // Body
 		body = m.activeRequest().editor.body
-	}
+		if focused {
+			body += "█"
+		}
+		if body == "" {
+			body = "Enter body text..."
+		}
 
-	if body == "" {
-		body = "Enter body text..."
+	case 1, 2: // Headers / Query
+		list := m.activeRequest().editor.reqHeaders
+		itemName := "header"
+		if activeTab == 2 {
+			list = m.activeRequest().editor.queryParameters
+			itemName = "query param"
+		}
+		var rows []string
+		for i, h := range list {
+			line := h.Key + ": " + h.Value
+			switch {
+			case i == m.kvCursor && m.kvEditing:
+				if m.kvOnValue {
+					line = h.Key + ": " + h.Value + "█"
+				} else {
+					line = h.Key + "█: " + h.Value
+				}
+				rows = append(rows, styles.URLInputStyle.Render(line))
+			case i == m.kvCursor:
+				rows = append(rows, styles.ListItemSelectedStyle.Render(line))
+			default:
+				rows = append(rows, styles.ListItemStyle.Render(line))
+			}
+		}
+		if len(rows) == 0 {
+			rows = append(rows, styles.PlaceholderStyle.Render("Press n to add a "+itemName))
+		}
+		body = strings.Join(rows, "\n")
+
+	case 3: // Auth
+		a := m.activeRequest().editor.auth
+		rows := []string{styles.ListItemStyle.Render("Type: "+a.authtype.String()) +
+			styles.PlaceholderStyle.Render("  (t to change)")}
+		for i, f := range m.authFields() {
+			line := f.label + ": " + *f.value
+			switch {
+			case i == m.authCursor && m.authEditing:
+				rows = append(rows, styles.URLInputStyle.Render(line+"█"))
+			case i == m.authCursor:
+				rows = append(rows, styles.ListItemSelectedStyle.Render(line))
+			default:
+				rows = append(rows, styles.ListItemStyle.Render(line))
+			}
+		}
+		body = strings.Join(rows, "\n")
 	}
 
 	tabs := styles.RenderTabs([]string{"Body", "Headers", "Query", "Auth"}, activeTab)
@@ -62,7 +111,9 @@ func (m Model) renderUri(uri string, width int, focused bool) string {
 	text := uri
 	style := styles.URLInputStyle
 
-	if text == "" {
+	if focused {
+		text += "█"
+	} else if text == "" {
 		text = "Enter a URL..."
 		style = styles.PlaceholderStyle
 	}

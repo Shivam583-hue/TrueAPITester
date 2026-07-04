@@ -17,6 +17,25 @@ const (
 	AuthAPIKey
 )
 
+func (t AuthType) String() string {
+	switch t {
+	case AuthBearer:
+		return "Bearer"
+	case AuthBasic:
+		return "Basic"
+	case AuthAPIKey:
+		return "API Key"
+	default:
+		return "None"
+	}
+}
+
+// authField pairs a display label with a pointer to the string it edits.
+type authField struct {
+	label string
+	value *string
+}
+
 type Auth struct {
 	authtype AuthType
 
@@ -97,4 +116,13 @@ type Model struct {
 	requestCursor int
 	namingRequest bool
 	nameInput     string
+
+	// key-value editing state (Headers / Query tabs)
+	kvCursor  int
+	kvEditing bool
+	kvOnValue bool
+
+	// auth editing state
+	authCursor  int
+	authEditing bool
 }

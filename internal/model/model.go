@@ -26,6 +26,44 @@ func (m *Model) activeRequest() *Requests {
 	return &m.requests[m.requestCursor]
 }
 
+// activeKVList returns the key-value list being edited on the current
+// editor tab: request headers (tab 1) or query parameters (tab 2).
+func (m *Model) activeKVList() *[]Header {
+	if m.activeRequest().editorTab == 2 {
+		return &m.activeRequest().editor.queryParameters
+	}
+	return &m.activeRequest().editor.reqHeaders
+}
+
+// authFields returns the editable fields for the active request's auth type.
+func (m *Model) authFields() []authField {
+	a := &m.activeRequest().editor.auth
+	switch a.authtype {
+	case AuthBearer:
+		return []authField{{"Token", &a.token}}
+	case AuthBasic:
+		return []authField{{"Username", &a.username}, {"Password", &a.password}}
+	case AuthAPIKey:
+		return []authField{{"Key Name", &a.keyName}, {"Key Value", &a.keyValue}}
+	}
+	return nil
+}
+
+// editString applies rune/space/backspace input to a string field.
+func editString(s *string, msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyRunes:
+		*s += string(msg.Runes)
+	case tea.KeySpace:
+		*s += " "
+	case tea.KeyBackspace:
+		if len(*s) > 0 {
+			runes := []rune(*s)
+			*s = string(runes[:len(runes)-1])
+		}
+	}
+}
+
 func (m *Model) Init() tea.Cmd {
 	return nil
 }
@@ -83,21 +121,111 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Editor tab, body
+		// Editor pane
 		if m.focused == FocusEditor {
-			if m.activeRequest().editorTab == 0 {
-				switch msg.Type {
-				case tea.KeyRunes:
-					m.activeRequest().editor.body += string(msg.Runes)
-				case tea.KeySpace:
-					m.activeRequest().editor.body += string(" ")
-				case tea.KeyBackspace:
-					if len(m.activeRequest().editor.body) > 0 {
-						runes := []rune(m.activeRequest().editor.body)
-						m.activeRequest().editor.body = string(runes[:len(runes)-1])
-					}
-				case tea.KeyEnter:
+			switch m.activeRequest().editorTab {
+			case 0: // Body
+				if msg.Type == tea.KeyEnter {
 					m.activeRequest().editor.body += "\n"
+				} else {
+					editString(&m.activeRequest().editor.body, msg)
+				}
+
+			case 1, 2: // Headers / Query
+				list := m.activeKVList()
+				if m.kvCursor >= len(*list) {
+					m.kvCursor = 0
+					if len(*list) > 0 {
+						m.kvCursor = len(*list) - 1
+					}
+				}
+				if m.kvEditing {
+					row := &(*list)[m.kvCursor]
+					target := &row.Key
+					if m.kvOnValue {
+						target = &row.Value
+					}
+					switch msg.Type {
+					case tea.KeyEnter:
+						if m.kvOnValue {
+							m.kvEditing = false
+							m.kvOnValue = false
+						} else {
+							m.kvOnValue = true
+						}
+					case tea.KeyEsc:
+						m.kvEditing = false
+						m.kvOnValue = false
+					case tea.KeyCtrlC:
+						m.quitting = true
+						return m, tea.Quit
+					default:
+						editString(target, msg)
+					}
+					return m, nil
+				}
+				switch msg.String() {
+				case "n":
+					*list = append(*list, Header{})
+					m.kvCursor = len(*list) - 1
+					m.kvEditing = true
+					m.kvOnValue = false
+				case "d":
+					if len(*list) > 0 {
+						*list = append((*list)[:m.kvCursor], (*list)[m.kvCursor+1:]...)
+						if m.kvCursor >= len(*list) && m.kvCursor > 0 {
+							m.kvCursor--
+						}
+					}
+				case "enter":
+					if len(*list) > 0 {
+						m.kvEditing = true
+						m.kvOnValue = false
+					}
+				case "up":
+					if m.kvCursor > 0 {
+						m.kvCursor--
+					}
+				case "down":
+					if m.kvCursor < len(*list)-1 {
+						m.kvCursor++
+					}
+				}
+
+			case 3: // Auth
+				fields := m.authFields()
+				if m.authCursor >= len(fields) {
+					m.authCursor = 0
+				}
+				if m.authEditing {
+					switch msg.Type {
+					case tea.KeyEnter, tea.KeyEsc:
+						m.authEditing = false
+					case tea.KeyCtrlC:
+						m.quitting = true
+						return m, tea.Quit
+					default:
+						editString(fields[m.authCursor].value, msg)
+					}
+					return m, nil
+				}
+				switch msg.String() {
+				case "t":
+					a := &m.activeRequest().editor.auth
+					a.authtype = (a.authtype + 1) % (AuthAPIKey + 1)
+					m.authCursor = 0
+				case "enter":
+					if len(fields) > 0 {
+						m.authEditing = true
+					}
+				case "up":
+					if m.authCursor > 0 {
+						m.authCursor--
+					}
+				case "down":
+					if m.authCursor < len(fields)-1 {
+						m.authCursor++
+					}
 				}
 			}
 		}
