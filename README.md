@@ -14,7 +14,10 @@ A fast, keyboard-driven API client that lives entirely in your terminal.
 
 ## Demo
 
-https://github.com/Shivam583-hue/TrueAPITester/blob/main/demo_compressed.mp4
+
+
+https://github.com/user-attachments/assets/5a71ad80-b524-4171-913b-640a9555d375
+
 
 ---
 
