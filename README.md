@@ -1,23 +1,49 @@
 # TrueAPITester
 
+> Most API clients are Electron apps that eat 300MB of RAM, require an account, and sync your requests to someone else's cloud.
+> This one is a single binary, opens in a millisecond, and keeps your data in a plain JSON file you own.
+
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Latest Release](https://img.shields.io/github/v/release/Shivam583-hue/TrueAPITester)](https://github.com/Shivam583-hue/TrueAPITester/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)](#installation)
+
 A fast, keyboard-driven API client that lives entirely in your terminal.
 
-<!--
-  Demo goes here. Once you have a recording, replace this comment with:
-  ![demo](docs/demo.gif)
--->
-<p align="center">
-  <em>Demo coming soon</em>
-</p>
+---
+
+## Demo
+
+https://github.com/Shivam583-hue/TrueAPITester/blob/main/demo_compressed.mp4
+
+---
+
+## Why not Postman, Insomnia, or Bruno?
+
+| | TrueAPITester | Postman | Insomnia | Bruno |
+|---|---|---|---|---|
+| **Runtime** | Single native binary | Electron (~300MB) | Electron (~300MB) | Electron (~200MB) |
+| **Account required** | No | Yes (for sync) | Yes (for sync) | No |
+| **Startup time** | Instant | 3-8 seconds | 3-8 seconds | 2-5 seconds |
+| **Cloud sync of requests** | Never - local only | Optional, on by default | Optional, on by default | Never |
+| **Stays in your terminal** | Yes | No | No | No |
+| **Keyboard-driven** | Fully | Partial | Partial | Partial |
+
+If you already live in the terminal - you `ssh` into servers, you run `git` from the command line, you have `nvim` or `tmux` open - switching to a GUI app just to fire off an API request breaks your flow.
+TrueAPITester lets you stay where you are.
+
+---
 
 ## Features
 
-- **Collections** — organize requests in a sidebar, saved automatically to disk between sessions.
-- **Full request editor** — method, URL, body, headers, query parameters, and auth (Bearer / Basic / API Key), each on its own tab.
-- **Real HTTP requests** — sent with Go's standard `net/http`, no proxy or subprocess involved.
-- **Readable responses** — syntax-highlighted JSON, raw body, response headers, and cookies, each on its own tab.
-- **Run history** — every send is kept per request, so you can page back through past runs and compare status, timing, and size.
-- **Context-aware help bar** — shows the keys relevant to whatever pane you're in, with a one-time full reference on first launch.
+- **Collections** - organize requests in a sidebar, saved automatically to disk between sessions.
+- **Full request editor** - method, URL, body, headers, query parameters, and auth (Bearer / Basic / API Key), each on its own tab.
+- **Real HTTP requests** - sent with Go's standard `net/http`, no proxy or subprocess involved.
+- **Readable responses** - syntax-highlighted JSON, raw body, response headers, and cookies, each on its own tab.
+- **Run history** - every send is kept per request, so you can page back through past runs and compare status, timing, and size.
+- **Context-aware help bar** - shows the keys relevant to whatever pane you're in, with a one-time full reference on first launch.
+
+---
 
 ## Installation
 
@@ -76,15 +102,19 @@ go build -o apitester ./cmd/APITester
 ./apitester
 ```
 
-Or run it directly without a separate build step:
+Or run directly without a separate build step:
 
 ```sh
 go run ./cmd/APITester
 ```
 
+---
+
 ## Usage
 
-The window is split into a request sidebar, method/URL bar, request editor, and response pane. `←`/`→` move focus between them; a short, context-aware hint bar at the bottom always shows what's available. Press `?` at any time for the full keybinding reference.
+The window is split into a request sidebar, method/URL bar, request editor, and response pane.
+`←`/`→` move focus between them; a short, context-aware hint bar at the bottom always shows what's available.
+Press `?` at any time for the full keybinding reference.
 
 ### Sidebar
 
@@ -104,7 +134,7 @@ The window is split into a request sidebar, method/URL bar, request editor, and 
 
 ### Editor (Body / Headers / Query / Auth tabs)
 
-| Key             | Action                                    |
+| Key             | Action                                     |
 | --------------- | ------------------------------------------ |
 | `tab`           | Switch editor tab                          |
 | _type_          | Edit body text (Body tab)                  |
@@ -118,29 +148,47 @@ The window is split into a request sidebar, method/URL bar, request editor, and 
 
 ### Result (Pretty / Raw / Headers / Cookies tabs)
 
-| Key             | Action                        |
-| --------------- | ----------------------------- |
+| Key             | Action                         |
+| --------------- | ------------------------------ |
 | `tab`           | Switch result tab              |
-| `↑` / `↓`       | Scroll                          |
-| `pgup` / `pgdn` | Page-scroll                     |
+| `↑` / `↓`       | Scroll                         |
+| `pgup` / `pgdn` | Page-scroll                    |
 | `[` / `]`       | Go to the previous / next run  |
 
 ### Global
 
-| Key       | Action                                    |
+| Key       | Action                                     |
 | --------- | ------------------------------------------ |
 | `ctrl+s`  | Send the active request                    |
 | `ctrl+w`  | Save the collection to disk                |
 | `?`       | Toggle the full help reference             |
 | `ctrl+c`  | Quit (also saves the collection)           |
 
+---
+
 ## Data storage
 
-Collections (requests, editor state, and run history) are saved as JSON under your OS config directory, e.g. `~/.config/trueapitester/collection.json` on Linux. The file is loaded automatically on startup and saved automatically on exit.
+Collections are saved as human-readable JSON under your OS config directory:
+
+- **Linux:** `~/.config/trueapitester/collection.json`
+- **macOS:** `~/Library/Application Support/trueapitester/collection.json`
+- **Windows:** `%AppData%\trueapitester\collection.json`
+
+The file is loaded automatically on startup and saved automatically on quit.
+You can also save manually at any time with `ctrl+w`.
+
+The format is plain JSON - you can read it, back it up, diff it in git, or copy it between machines without any special tooling.
+Your requests are never sent to any server.
+
+If the file is corrupted (e.g. from a crash mid-write), TrueAPITester automatically renames it to `collection.json.bak` and starts fresh rather than crashing, so you never lose your previous state entirely.
+
+Each request also stores up to 50 past responses as run history, so you can compare results across sessions without re-sending.
+
+---
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
