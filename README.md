@@ -86,7 +86,7 @@ sudo mv apitester /usr/local/bin/
 apitester
 ```
 
-### Windows (PowerShell)
+### Windows (PowerShell as admin)
 
 ```powershell
 curl.exe -L https://github.com/Shivam583-hue/TrueAPITester/releases/latest/download/trueapitester-windows-amd64.exe -o apitester.exe
